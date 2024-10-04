@@ -190,7 +190,13 @@ def fetch_peptide_observations(peptide_accession, sequence, gene_accession):
         soup = BeautifulSoup(response.content, 'html.parser')
 
         # Find the observations table
-        table = soup.find('table', {'class': 'PA_sort_table'})
+        # Find all tables with the class 'PA_sort_table'
+        tables = soup.find_all('table', {'class': 'PA_sort_table'})
+
+        # Check if there are at least two tables found
+        if len(tables) >= 2:
+            table = tables[1]  # Select the second occurrence (index 1)
+
         if not table:
             print(f"No observations table found for peptide {peptide_accession}")
             return 0
