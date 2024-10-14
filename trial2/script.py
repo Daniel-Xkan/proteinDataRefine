@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
 #run the script #########################################################################
 
-def split_file(file_path, num_splits=20):
+def split_file(file_path, num_splits=50):
     print(f"Splitting file: {file_path} into {num_splits} parts")
     with open(file_path, 'r') as f:
         lines = f.readlines()
@@ -121,12 +121,12 @@ def split_file(file_path, num_splits=20):
 
 # Usage
 file_path = 'PA2024_HPP_peptides.txt'
-split_file(file_path, num_splits=20)
+split_file(file_path, num_splits=50)
 
 
 import subprocess
 
-files = [f"PA2024_HPP_peptides_part_{i}.txt" for i in range(1, 21)]
+files = [f"PA2024_HPP_peptides_part_{i}.txt" for i in range(1, 51)]
 
 processes = []
 for file in files:
