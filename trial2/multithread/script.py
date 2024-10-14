@@ -1,5 +1,7 @@
+import os
 import sys
-import subprocess
+from multiprocessing import Pool, cpu_count
+
 import requests
 from bs4 import BeautifulSoup
 
@@ -73,7 +75,17 @@ def save_usi(protein_id, usi, modified=False):
     with open(file_name, 'a') as file:
         file.write(f"{usi}\n")
 
-# Function to split the peptide file into smaller parts
+# Function to process a peptide file and handle each peptide
+def process_peptide_file(file_path):
+    print(f"Processing peptide file: {file_path}")
+    with open(file_path, 'r') as f:
+        next(f)  # Skip header
+        for line in f:
+            protein_id, peptide_id, sequence = line.strip().split('\t')
+            print(f"Processing line: {line.strip()}")
+            process_peptide_spectra(protein_id, peptide_id)
+
+# Function to split the peptide file into parts for multiprocessing
 def split_file(file_path, num_splits=50):
     print(f"Splitting file: {file_path} into {num_splits} parts")
     with open(file_path, 'r') as f:
@@ -97,33 +109,20 @@ def split_file(file_path, num_splits=50):
         
         print(f"Created split file: {split_file_name}")
 
-# Function to process the peptide file
-def process_peptide_file(file_path):
-    print(f"Processing peptide file: {file_path}")
-    with open(file_path, 'r') as f:
-        next(f)  # Skip header
-        for line in f:
-            protein_id, peptide_id, sequence = line.strip().split('\t')
-            print(f"Processing line: {line.strip()}")
-            process_peptide_spectra(protein_id, peptide_id)
+# Main function to run the multiprocessing
+def main(peptide_file):
+    # Split the main file into smaller parts
+    split_file(peptide_file, num_splits=50)
 
-# Main function to handle splitting and parallel processing
-def main(file_path):
-    num_splits = 50  # Define how many splits you want
-    split_file(file_path, num_splits)  # Split the file into parts
+    # Create a pool of workers based on the number of CPU cores
+    num_workers = min(6, cpu_count())  # Max 6 workers for a 6-core machine
 
-    # Create a list of the split files
-    files = [f"{file_path.split('.txt')[0]}_part_{i}.txt" for i in range(1, num_splits + 1)]
+    # List all the split files
+    split_files = [f"{peptide_file.split('.txt')[0]}_part_{i + 1}.txt" for i in range(50)]
 
-    # Launch subprocesses for each split file
-    processes = []
-    for file in files:
-        proc = subprocess.Popen(['python', 'script.py', file])  # Adjust 'script.py' if needed
-        processes.append(proc)
-
-    # Wait for all subprocesses to finish
-    for proc in processes:
-        proc.wait()
+    # Process each split file in parallel
+    with Pool(processes=num_workers) as pool:
+        pool.map(process_peptide_file, split_files)
 
     print("All processes finished.")
 
@@ -134,5 +133,3 @@ if __name__ == "__main__":
 
     peptide_file = sys.argv[1]
     main(peptide_file)
-
-    print("Processing complete and USIs stored.")
