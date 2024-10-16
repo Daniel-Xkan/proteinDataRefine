@@ -10,47 +10,38 @@ from bs4 import BeautifulSoup
 def create_peptide_url(peptide_id):
     base_url = "https://db.systemsbiology.net/sbeams/cgi/PeptideAtlas/GetPeptide"
     url = f"{base_url}?_tab=3&atlas_build_id=572&searchWithinThis=Peptide+Name&searchForThis={peptide_id}&action=QUERY"
-    print(f"Created PeptideAtlas URL: {url}")
     return url
 
 # Function to capture the USI from the Spectrum page
 def get_usi_from_spectrum(spectrum_url):
     try:
-        print(f"Fetching Spectrum URL: {spectrum_url}")
         response = requests.get(spectrum_url)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Locate the USI form and extract the value
+
         usi_input = soup.find('input', {'name': 'USI'})
         if usi_input:
             usi = usi_input['value']
-            print(f"USI found: {usi}")
             if usi.startswith('mzspec:PXD') or usi.startswith('mzspec:MSV'):
                 return usi
-        else:
-            print("No USI found in this spectrum.")
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching spectrum URL: {spectrum_url}, Error: {e}")
-    
+    except requests.exceptions.RequestException:
+        pass
     return None
 
 # Function to extract USIs from the individual spectra table
-def process_peptide_spectra(protein_id, peptide_id):
-    print(f"Processing peptide: {peptide_id} for protein: {protein_id}")
+def process_peptide_spectra(data):
+    protein_id, peptide_id, worker_id = data
     url = create_peptide_url(peptide_id)
-    
+
     try:
         response = requests.get(url)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Parse individual spectra table
+
         spectra_table = soup.find('table', {'id': 'individual_spectra'})
         if not spectra_table:
-            print(f"No spectra table found for peptide: {peptide_id}")
             return
-        
+
         for row in spectra_table.find_all('tr')[1:]:  # Skip the header row
             spectrum_link = row.find('a', href=True)
             if spectrum_link:
@@ -58,74 +49,60 @@ def process_peptide_spectra(protein_id, peptide_id):
                 usi = get_usi_from_spectrum(spectrum_url)
                 if usi:
                     peptide_identifier = usi.split(':')[-1].split('/')[0]
-                    if '[' in peptide_identifier or ']' in peptide_identifier:
-                        print(f"Modified peptide identified: {peptide_identifier}")
-                        save_usi(protein_id, usi, modified=True)
-                    else:
-                        print(f"Unmodified peptide identified: {peptide_identifier}")
-                        save_usi(protein_id, usi, modified=False)
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching peptide URL: {url}, Error: {e}")
+                    modified = '[' in peptide_identifier or ']' in peptide_identifier
+                    save_usi(protein_id, usi, modified)
+    except requests.exceptions.RequestException:
+        pass
+
+    print(f"Worker {worker_id} finished processing peptide {peptide_id}")
 
 # Function to save the USI to the corresponding file
 def save_usi(protein_id, usi, modified=False):
     file_name = f"{protein_id}_{'modified' if modified else 'unmodified'}_peptides_usi.txt"
-    print(f"Saving USI to file: {file_name}")
-    
     with open(file_name, 'a') as file:
         file.write(f"{usi}\n")
 
-# Function to process a peptide file and handle each peptide
-def process_peptide_file(file_path):
-    print(f"Processing peptide file: {file_path}")
+# Function to process peptide file split into parts
+def process_peptide_file(file_path, worker_id):
     with open(file_path, 'r') as f:
         next(f)  # Skip header
         for line in f:
-            protein_id, peptide_id, sequence = line.strip().split('\t')
-            print(f"Processing line: {line.strip()}")
-            process_peptide_spectra(protein_id, peptide_id)
+            protein_id, peptide_id, _ = line.strip().split('\t')
+            process_peptide_spectra((protein_id, peptide_id, worker_id))
 
-# Function to split the peptide file into parts for multiprocessing
+# Split the large file into smaller parts
 def split_file(file_path, num_splits=50):
-    print(f"Splitting file: {file_path} into {num_splits} parts")
     with open(file_path, 'r') as f:
         lines = f.readlines()
-    
-    # Skip the header line
+
     header = lines[0]
     data_lines = lines[1:]
-    
-    # Calculate the number of lines per split
+
     split_size = len(data_lines) // num_splits
-    
     for i in range(num_splits):
         split_file_name = f"{file_path.split('.txt')[0]}_part_{i + 1}.txt"
         with open(split_file_name, 'w') as split_file:
             split_file.write(header)  # Write the header
-            # Write the corresponding data lines
             start_index = i * split_size
             end_index = start_index + split_size if i < num_splits - 1 else len(data_lines)
             split_file.writelines(data_lines[start_index:end_index])
-        
-        print(f"Created split file: {split_file_name}")
 
-# Main function to run the multiprocessing
-def main(peptide_file):
-    # Split the main file into smaller parts
-    split_file(peptide_file, num_splits=50)
+# Main function for parallel processing
+def main(file_path, num_splits=50):
+    split_file(file_path, num_splits)
+    files = [f"{file_path.split('.txt')[0]}_part_{i + 1}.txt" for i in range(1, num_splits + 1)]
 
-    # Create a pool of workers based on the number of CPU cores
-    num_workers = min(6, cpu_count())  # Max 6 workers for a 6-core machine
+    # Use a Pool with imap_unordered for multiprocessing
+    with Pool(processes=cpu_count()) as pool:
+        pool.imap_unordered(process_peptide_file_with_worker, enumerate(files, 1))
+        pool.close()
+        pool.join()
 
-    # List all the split files
-    split_files = [f"{peptide_file.split('.txt')[0]}_part_{i + 1}.txt" for i in range(50)]
+def process_peptide_file_with_worker(data):
+    worker_id, file = data
+    process_peptide_file(file, worker_id)
 
-    # Process each split file in parallel
-    with Pool(processes=num_workers) as pool:
-        pool.map(process_peptide_file, split_files)
-
-    print("All processes finished.")
-
+# Usage
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python script.py <path_to_peptide_file>")
