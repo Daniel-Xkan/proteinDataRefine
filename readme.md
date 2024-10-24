@@ -1,6 +1,8 @@
 # Automation for Protein and Spectrum Analysis
 
 ## 1. PeptideAtlas.org Coverage Extraction for Missing MassIVE-KB Proteins (/trial1) finished
+## Output2: https://docs.google.com/spreadsheets/d/1IapfxD00Edh9pzY-_HK2AhmILM9KMgJG/edit?gid=1887106609#gid=1887106609
+## Output2: https://docs.google.com/spreadsheets/d/1-511R051EgUqFPmuopSNwdHojBpCo0R5/edit?gid=2020971942#gid=2020971942
 
 ### Objective
 Identify peptides from PeptideAtlas.org not found in MassIVE-KB to improve protein coverage analysis.
@@ -24,7 +26,8 @@ Identify peptides from PeptideAtlas.org not found in MassIVE-KB to improve prote
    - Output relevant data to `PeptideAtlas_peptide_observations.tsv`.
    - Track experiment count (`NumExperiments`) and save peptide data to `PeptideAtlas_peptides.tsv`.
 
-## 2. Spectra Extraction for MassIVE Reanalysis (/trial2)
+## 2. Spectra Extraction for MassIVE Reanalysis (/trial2) output: 
+## Output: https://drive.google.com/drive/u/0/folders/1cNEofLbmqoPJIC2ED1diYP-oGNN9XzyW
 
 ### Part 1: Import Datasets (inprogress)
 1. **Dataset Preparation**:
