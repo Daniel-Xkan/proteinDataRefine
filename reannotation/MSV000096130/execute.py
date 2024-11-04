@@ -1,47 +1,61 @@
+import os
 import pandas as pd
 import re
 
-# Load filenames
-with open('mzml_files.txt', 'r') as file:
-    filenames = file.read().splitlines()
+with open("mzml_files.txt", "r") as file:
+    file_names = [line.strip() for line in file.readlines()]
 
-# Define the structure of the DataFrame with the required columns
-columns = ["Dataset", "Run", "Cohort", "Subject", "Condition", "TimePoint", "BioReplicate", 
-           "Experiment", "Batch", "Channel", "Fraction", "Species", "Disease", "Tissue", "Enzyme", "Notes"]
-data = {col: [] for col in columns}
+# Function to parse filename and extract required fields
+def parse_filename(filename):
 
-# Pattern for filenames with more identifiable structure
-pattern = re.compile(
-    r'(?P<Dataset>\d{8})_'           # Date (Dataset)
-    r'(?P<Run>QEh\d+_\w+)_?'         # Run (e.g., QEh1_LC1)
-    r'(?P<Cohort>\w+)?_'             # Cohort
-    r'(?P<Subject>\w+)?_'            # Subject
-    r'(?P<Condition>\w+)?_'          # Condition
-    r'(?P<TimePoint>\d+)?_'          # TimePoint
-    r'(?P<BioReplicate>R\d+)?'       # BioReplicate (e.g., R1, R2)
-    r'\.mzML'                        # File extension
-)
 
-# Parse each filename and populate columns
-for filename in filenames:
-    match = pattern.match(filename)
-    if match:
-        # Fill matched parts
-        for col, value in match.groupdict().items():
-            data[col].append(value if value else "")
-        # Fill remaining columns with empty strings
-        for col in columns:
-            if col not in match.groupdict():
-                data[col].append("")
-    else:
-        # If the filename doesn't match the pattern, add blanks
-        for col in columns:
-            data[col].append("")
+    dataset = "MSV000096130"  # Replace with actual logic if needed
+    run = filename
 
-# Create DataFrame
+    # Further processing to determine Condition and Cohort
+    cohort = ''  # Assuming the tissue is the cohort
+    condition = '' 
+    condition = ''   # Join conditions by comma
+    time_point = ''   # Not provided in the filename
+    experiment = ''   # Could be inferred if logic is provided
+    channel = ''   # Not applicable to mass spectrometry data
+    fraction = ''  # Not provided in the filename
+    species = "Human"  # Assuming human cell lines or tissues
+    disease = ''   # Not provided in the filename
+    enzyme = ''   # Not applicable to mass spectrometry data
+    notes = ""  # Placeholder for future notes
+
+    return {
+        "Dataset": dataset,
+        "Run": run,
+        "Cohort": cohort,
+        "Subject": '' ,
+        "Condition": condition,
+        "TimePoint": time_point,
+        "BioReplicate": '' ,
+        "Experiment": experiment,
+        "Batch": '' ,
+        "Channel": channel,
+        "Fraction": fraction,
+        "Species": species,
+        "Disease": disease,
+        "Tissue": '' ,
+        "Enzyme": enzyme,
+        "Notes": notes,
+    }
+
+
+# Create a list to hold each parsed file data
+data = []
+
+# Process each filename and append parsed data to the list
+for filename in file_names:
+    parsed_data = parse_filename(filename)
+    if parsed_data:
+        data.append(parsed_data)
+
+# Create a DataFrame and save to CSV
 df = pd.DataFrame(data)
+df.to_csv('annotated_data.csv', index=False)
 
-# Save to TSV
-df.to_csv("reannotated_MSV000096130.tsv", sep="\t", index=False)
-
-print("Parsed TSV saved as parsed_mzml_files.tsv")
+print("CSV file has been created: annotated_data.csv")
