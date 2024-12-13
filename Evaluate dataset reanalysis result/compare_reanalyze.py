@@ -1,0 +1,47 @@
+import pandas as pd
+
+# Read the PeptideAtlas USIs from merged.txt
+usi_file = 'merged.txt'
+with open(usi_file, 'r') as file:
+    usi_lines = file.readlines()
+
+usi_data = []
+for line in usi_lines:
+    parts = line.strip().split(':')
+    if len(parts) == 6:
+        dataset, spectrum_file, scan, peptide_identification, peptide_charge = parts[1], parts[2], parts[4], parts[5].split('/')[0], parts[5].split('/')[1]
+        usi_data.append([line.strip(), dataset, spectrum_file, scan, peptide_identification, peptide_charge])
+
+usi_df = pd.DataFrame(usi_data, columns=['USI', 'Dataset', 'Spectrum_File', 'Scan_Number', 'Peptide_Identification', 'Peptide_Charge'])
+
+# Read the reanalysis results from MSGF-PLUS-AMBIGUITY-81a33a88-group_by_spectrum-main.tsv
+reanalysis_file = 'MSGF-PLUS-AMBIGUITY-81a33a88-group_by_spectrum-main.tsv'
+reanalysis_df = pd.read_csv(reanalysis_file, sep='\t')
+
+# Initialize columns for the output DataFrame
+reanalysis_df['PeptideAtlas_USI'] = ''
+reanalysis_df['PeptideAtlas_peptide'] = ''
+reanalysis_df['PeptideAtlas_charge'] = ''
+
+# Match spectra from the PeptideAtlas USIs lists to the reanalysis results
+counter = 0
+for index, row in reanalysis_df.iterrows():
+    original_filepath = row['opt_global_OriginalFilepath']
+    scan_number = str(row['opt_global_scan'])
+    
+    match_found = False
+    for _, usi_row in usi_df.iterrows():
+        if usi_row['Spectrum_File'] in original_filepath and usi_row['Scan_Number'] == scan_number:
+            reanalysis_df.at[index, 'PeptideAtlas_USI'] = usi_row['USI']
+            reanalysis_df.at[index, 'PeptideAtlas_peptide'] = usi_row['Peptide_Identification']
+            reanalysis_df.at[index, 'PeptideAtlas_charge'] = usi_row['Peptide_Charge']
+            match_found = True
+            break
+    
+    counter += 1
+    if counter % 1000 == 0:
+        print(f'Processed {counter} rows. Match found: {match_found}')
+
+# Save the results to MSV000088387_reanalysis_compare.tsv
+output_file = 'MSV000088387_reanalysis_compare.tsv'
+reanalysis_df.to_csv(output_file, sep='\t', index=False)
