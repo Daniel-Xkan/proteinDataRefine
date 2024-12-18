@@ -1,4 +1,5 @@
 import pandas as pd
+import re
 
 # Read the PeptideAtlas USIs from merged.txt
 usi_file = 'merged.txt'
@@ -25,7 +26,10 @@ reanalysis_df = pd.read_csv(reanalysis_file, sep='\t')
 # Initialize columns for the output DataFrame
 reanalysis_df.insert(0, 'PeptideAtlas_USI', '')
 reanalysis_df.insert(1, 'PeptideAtlas_peptide', '')
-reanalysis_df.insert(2, 'PeptideAtlas_charge', '')
+reanalysis_df.insert(2, 'PeptideAtlas_peptide_demod', '')
+reanalysis_df.insert(3, 'Peptide_match', 0)
+reanalysis_df.insert(4, 'PeptideAtlas_charge', '')
+
 
 # Match spectra from the PeptideAtlas USIs lists to the reanalysis results
 for index, row in reanalysis_df.iterrows():
@@ -40,6 +44,12 @@ for index, row in reanalysis_df.iterrows():
         usi_row = usi_dict[key]
         reanalysis_df.at[index, 'PeptideAtlas_USI'] = usi_row['USI']
         reanalysis_df.at[index, 'PeptideAtlas_peptide'] = usi_row['Peptide_Identification']
+        # Remove all substrings like "[*]" from PeptideAtlas_peptide
+        peptide_demod = re.sub(r'\[.*?\]', '', usi_row['Peptide_Identification'])
+        reanalysis_df.at[index, 'PeptideAtlas_peptide_demod'] = peptide_demod
+        
+        # Set Peptide_match to 1 if PeptideAtlas_peptide_demod matches opt_global_UnmodPep, otherwise 0
+        reanalysis_df.at[index, 'Peptide_match'] = 1 if peptide_demod == row['opt_global_UnmodPep'] else 0
         reanalysis_df.at[index, 'PeptideAtlas_charge'] = usi_row['Peptide_Charge']
         print(f'Matched file: {usi_row["Spectrum_File"]}, Scan number: {usi_row["Scan_Number"]}')
     
