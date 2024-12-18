@@ -20,14 +20,14 @@ for _, row in usi_df.iterrows():
     usi_dict[key] = row
 
 # Read the reanalysis results from MSGF-PLUS-AMBIGUITY-81a33a88-group_by_spectrum-main.tsv
-reanalysis_file = 'MSGF-PLUS-AMBIGUITY-81a33a88-group_by_spectrum-main.tsv'
+reanalysis_file = 'filtered.tsv'
 reanalysis_df = pd.read_csv(reanalysis_file, sep='\t')
 
 # Initialize columns for the output DataFrame
 reanalysis_df.insert(0, 'PeptideAtlas_USI', '')
 reanalysis_df.insert(1, 'PeptideAtlas_peptide', '')
 reanalysis_df.insert(2, 'PeptideAtlas_peptide_demod', '')
-reanalysis_df.insert(3, 'Peptide_match', 0)
+reanalysis_df.insert(3, 'Peptide_match', '')
 reanalysis_df.insert(4, 'PeptideAtlas_charge', '')
 
 
@@ -56,6 +56,37 @@ for index, row in reanalysis_df.iterrows():
     # if index % 100 == 0:
     #     print(f'Processed {index} rows.')
 
+    # Identify the datasets and spectrum files that have at least one match
+    # matched_datasets = set()
+matched_spectrum_files = set()
+matched_scans = set()
+
+for index, row in reanalysis_df.iterrows():
+    if row['PeptideAtlas_USI']:
+        usi_parts = row['PeptideAtlas_USI'].split(':')
+        if len(usi_parts) == 6:
+            dataset = usi_parts[1].replace('.mzML', '')
+            spectrum_file = usi_parts[2]
+            matched_spectrum_files.add(spectrum_file)
+            matched_scans.add((spectrum_file, usi_parts[4]))
+
+# Add empty USIs for unmatched spectra
+for key, usi_row in usi_dict.items():
+    spectrum_file, scan_number = key
+    if usi_row['Dataset'] == 'PXD012308' and spectrum_file in matched_spectrum_files and key not in matched_scans:
+        new_row = {
+            'PeptideAtlas_USI': usi_row['USI'],
+            'PeptideAtlas_peptide': usi_row['Peptide_Identification'],
+            'PeptideAtlas_peptide_demod': re.sub(r'\[.*?\]', '', usi_row['Peptide_Identification']),
+            'Peptide_match': 0,
+            'PeptideAtlas_charge': usi_row['Peptide_Charge'],
+            'opt_global_OriginalFilepath': '',
+            'opt_global_scan': '',
+            'opt_global_UnmodPep': ''
+        }
+        reanalysis_df = reanalysis_df.append(new_row, ignore_index=True)
+
+
 # Save the results to MSV000088387_reanalysis_compare.tsv
-output_file = 'MSV000088387_reanalysis_compare.tsv'
+output_file = 'example_reanalysis_compare.tsv'
 reanalysis_df.to_csv(output_file, sep='\t', index=False)
