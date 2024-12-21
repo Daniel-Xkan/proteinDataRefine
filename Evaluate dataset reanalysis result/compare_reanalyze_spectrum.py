@@ -88,5 +88,5 @@ for key, usi_row in usi_dict.items():
 
 
 # Save the results to MSV000088387_reanalysis_compare.tsv
-output_file = 'example_reanalysis_compare.tsv'
+output_file = 'example_reanalysis_spectrum.tsv'
 reanalysis_df.to_csv(output_file, sep='\t', index=False)
