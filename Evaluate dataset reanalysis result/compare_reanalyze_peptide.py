@@ -1,5 +1,6 @@
 import pandas as pd
 from Bio import SeqIO
+from multiprocessing import Pool, cpu_count
 
 # Load the data
 spectrum_df = pd.read_csv('example_reanalysis_spectrum.tsv', sep='\t')
@@ -31,10 +32,51 @@ spectrum_df['Peptide sequence'] = spectrum_df.apply(get_peptide_sequence, axis=1
 unique_peptides = spectrum_df['Peptide sequence'].unique()
 
 # Load protein sequences from fasta file
+# Pre-compute and store sequences in a dictionary for faster lookups
 protein_sequences = {}
 for record in SeqIO.parse(fasta_file, "fasta"):
     gene_id = next((part.split('=')[1] for part in record.description.split() if part.startswith('GN=')), 'UNKNOWN')
-    protein_sequences[record.id] = (gene_id, str(record.seq).replace('I', 'L'))
+    protein_sequences[record.id] = {
+        'gene_id': gene_id,
+        'sequence': str(record.seq).replace('I', 'L')
+    }
+
+# Function to count matches in protein sequences
+def count_matches(peptide, allow_mutation=False):
+    peptide = peptide.replace('I', 'L')
+    protein_ids = set()
+    gene_ids = set()
+    protein_list = []
+    gene_list = []
+    
+    for header, data in protein_sequences.items():
+        gene_id = data['gene_id']
+        sequence = data['sequence']
+        protein_id = header.split('|')[1] if '|' in header else header
+        
+        if allow_mutation:
+            # Check for near-matches (SAAP)
+            for i in range(len(sequence) - len(peptide) + 1):
+                window = sequence[i:i+len(peptide)]
+                if sum(1 for a, b in zip(peptide, window) if a != b) <= 1:
+                    protein_ids.add(protein_id)
+                    gene_ids.add(gene_id)
+                    break
+        else:
+            # Check for exact matches
+            if peptide in sequence:
+                protein_ids.add(protein_id)
+                gene_ids.add(gene_id)
+    
+    # Return counts and lists
+    return (
+        len(protein_ids), 
+        len(gene_ids), 
+        ';'.join(protein_ids) if protein_ids else 'None', 
+        ';'.join(gene_ids) if gene_ids else 'UNKNOWN'
+    )
+################################################################################################
+
 
 # Function to count matches in protein sequences
 # def count_matches(peptide, allow_mutation=False):
@@ -58,49 +100,8 @@ for record in SeqIO.parse(fasta_file, "fasta"):
 #                 gene_ids.add(gene_id)
 #     return protein_ids, gene_ids
 
-#deepseek version:####################################################
-def count_matches(peptide, allow_mutation=False):
-    peptide = peptide.replace('I', 'L')
-    protein_ids = set()
-    gene_ids = set()
-    protein_list = []
-    gene_list = []
-    
-    for header, gene_and_sequence in protein_sequences.items():
-        gene_id, sequence = gene_and_sequence
-        # print(protein_sequences.items())
-        header_parts = header.split()
-        # Extract protein ID (middle part of the first segment, e.g., "B4E2Q0")
-        protein_id = header_parts[0].split('|')[1] if '|' in header_parts[0] else header_parts[0]
-        # Extract gene ID (from GN= tag)
-        # print(header_parts)
-        # gene_id = next((part.split('=')[1] for part in header_parts if part.startswith('GN=')), 'UNKNOWN')
-        # print(gene_id)
 
-        
-        if allow_mutation:
-            # Check for near-matches (SAAP)
-            for i in range(len(sequence) - len(peptide) + 1):
-                window = sequence[i:i+len(peptide)]
-                if sum(1 for a, b in zip(peptide, window) if a != b) <= 1:
-                    protein_ids.add(protein_id)
-                    gene_ids.add(gene_id)
-                    break
-        else:
-            # Check for exact matches
-            if peptide in sequence:
-                protein_ids.add(protein_id)
-                gene_ids.add(gene_id)
-        # print(protein_ids)
-        # print(gene_ids)
-    # Return counts and lists
-    return (
-        len(protein_ids), 
-        len(gene_ids), 
-        ';'.join(protein_ids) if protein_ids else 'None', 
-        ';'.join(gene_ids) if gene_ids else 'UNKNOWN'
-    )
-################################################################################################
+
 
 # Populate the output DataFrame
 output_rows = []
@@ -132,7 +133,7 @@ output_rows = []
 #     output_rows.append(peptide_row)
 
 #deepseek version:####################################################
-for peptide in unique_peptides:
+def process_peptide(peptide):
     peptide_data = spectrum_df[spectrum_df['Peptide sequence'] == peptide]
     # Get exact matches and SAAP matches
     num_proteins, num_genes, list_proteins, list_genes = count_matches(peptide)
@@ -157,12 +158,26 @@ for peptide in unique_peptides:
         'Num_genes_saap': num_genes_saap,
         'List_genes_saap': list_genes_saap
     }
-    output_rows.append(peptide_row)
-################################################################################################
     print(peptide_row)
+    return peptide_row
+
+# Use multiprocessing to process peptides in parallel
+if __name__ == '__main__':
+    counter = 0
+    total_peptides = len(unique_peptides)
     
+    def update_counter(result):
+        global counter
+        counter += 1
+        print(f"Processed {counter}/{total_peptides} peptides")
 
-output_df = pd.DataFrame(output_rows)
+    with Pool(cpu_count()) as pool:
+        output_rows = []
+        for peptide_row in pool.imap_unordered(process_peptide, unique_peptides):
+            output_rows.append(peptide_row)
+            update_counter(peptide_row)
 
-# Save the output DataFrame to a TSV file
-output_df.to_csv('example_reanalysis_peptide.tsv', sep='\t', index=False)
+    output_df = pd.DataFrame(output_rows)
+
+    # Save the output DataFrame to a TSV file
+    output_df.to_csv('example_reanalysis_peptide.tsv', sep='\t', index=False)
