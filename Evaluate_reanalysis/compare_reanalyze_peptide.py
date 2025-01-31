@@ -3,8 +3,8 @@ from Bio import SeqIO
 from multiprocessing import Pool, cpu_count
 
 # Load the data
-spectrum_df = pd.read_csv('example_reanalysis_spectrum.tsv', sep='\t')
-peptideatlas_df = pd.read_csv('PeptideAtlas_peptides.tsv', sep='\t')
+spectrum_df = pd.read_csv('example_reanalysis_spectrum.tsv', sep='\t', low_memory=False, dtype=str)
+peptideatlas_df = pd.read_csv('PeptideAtlas_peptides.tsv', sep='\t', low_memory=False)
 fasta_file = 'uniprotkb_human_proteome_UP000005640_with_isoforms_2024-10-08.fasta'
 
 # Define a function to get the peptide sequence
