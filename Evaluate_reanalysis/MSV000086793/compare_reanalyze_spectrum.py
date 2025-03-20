@@ -21,7 +21,7 @@ for _, row in usi_df.iterrows():
 
 # Read the reanalysis results from MSGF-PLUS-AMBIGUITY-81a33a88-group_by_spectrum-main.tsv
 reanalysis_file = 'filtered.tsv'
-reanalysis_df = pd.read_csv(reanalysis_file, sep='\t')
+reanalysis_df = pd.read_csv(reanalysis_file, sep='\t', low_memory=False)
 
 # Initialize columns for the output DataFrame
 reanalysis_df.insert(0, 'PeptideAtlas_USI', '')
@@ -69,11 +69,12 @@ for index, row in reanalysis_df.iterrows():
             spectrum_file = usi_parts[2]
             matched_spectrum_files.add(spectrum_file)
             matched_scans.add((spectrum_file, usi_parts[4]))
+print(f'Matched {len(matched_spectrum_files)} spectrum files and {len(matched_scans)} scans.')
 
 # Add empty USIs for unmatched spectra
 for key, usi_row in usi_dict.items():
     spectrum_file, scan_number = key
-    if usi_row['Dataset'] == 'PXD012308' and spectrum_file in matched_spectrum_files and key not in matched_scans:
+    if spectrum_file in matched_spectrum_files and key not in matched_scans:
         new_row = {
             'PeptideAtlas_USI': usi_row['USI'],
             'PeptideAtlas_peptide': usi_row['Peptide_Identification'],

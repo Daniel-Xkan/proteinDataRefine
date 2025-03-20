@@ -69,12 +69,14 @@ for index, row in reanalysis_df.iterrows():
             spectrum_file = usi_parts[2]
             matched_spectrum_files.add(spectrum_file)
             matched_scans.add((spectrum_file, usi_parts[4]))
+print(f'Matched {len(matched_spectrum_files)} spectrum files and {len(matched_scans)} scans.')
 
 # Add empty USIs for unmatched spectra
+unmatched_rows = []
 for key, usi_row in usi_dict.items():
     spectrum_file, scan_number = key
     if usi_row['Dataset'] == 'PXD012308' and spectrum_file in matched_spectrum_files and key not in matched_scans:
-        new_row = {
+        unmatched_rows.append({
             'PeptideAtlas_USI': usi_row['USI'],
             'PeptideAtlas_peptide': usi_row['Peptide_Identification'],
             'PeptideAtlas_peptide_demod': re.sub(r'\[.*?\]', '', usi_row['Peptide_Identification']),
@@ -83,8 +85,12 @@ for key, usi_row in usi_dict.items():
             'opt_global_OriginalFilepath': '',
             'opt_global_scan': '',
             'opt_global_UnmodPep': ''
-        }
-        reanalysis_df = reanalysis_df.append(new_row, ignore_index=True)
+        })
+
+# Append all unmatched rows at once to improve performance
+if unmatched_rows:
+    unmatched_df = pd.DataFrame(unmatched_rows)
+    reanalysis_df = pd.concat([reanalysis_df, unmatched_df], ignore_index=True)
 
 
 # Save the results to MSV000088387_reanalysis_compare.tsv
