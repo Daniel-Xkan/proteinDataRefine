@@ -17,14 +17,27 @@ def get_peptide_charge(row):
 
     # Define a function to get the protein ID from the sequence column "tr|D9J307|D9J307_HUMAN"
 def get_protein_id_from_msgf(row):
-    accession = row['accession']
-    if isinstance(accession, str) and '|' in accession:
-        parts = accession.split('|')
-        if len(parts) > 1:
-            return parts[1]
-    return None
+#accession ############################################    
+#   accession = row['accession']
 
+
+#     if isinstance(accession, str) and '|' in accession:
+#         parts = accession.split('|')
+#         if len(parts) > 1:
+#             return parts[1]
+#     return None
+#######################################################
+#TopCanonicalProtein #################################
+    TopCanonicalProtein = row['opt_global_TopCanonicalProtein']
+    return TopCanonicalProtein
 # Create a new DataFrame for the output
+
+def get_protein_id_from_pa(row):
+    peptide_sequence = row['Peptide sequence']
+    matching_rows = peptideatlas_df[peptideatlas_df.iloc[:, 5] == peptide_sequence]
+    if not matching_rows.empty:
+        return matching_rows.iloc[0, 0]  # Return the protein ID from column 0
+    return None
 output_df = pd.DataFrame()
 
 # Get unique peptides
@@ -143,7 +156,8 @@ def process_peptide(peptide):
     peptide_row = {
         'Peptide sequence': peptide,
         'Peptide charge': peptide_data.apply(get_peptide_charge, axis=1).iloc[0],
-        'Protein identifier': peptide_data.apply(get_protein_id_from_msgf, axis=1).iloc[0],
+        'Protein identifier MSGF': peptide_data.apply(get_protein_id_from_msgf, axis=1).iloc[0],
+        'Protein identifier PA': peptide_data.apply(get_protein_id_from_pa, axis=1).iloc[0],
         'Num_specs_both': len(peptide_data[(pd.notna(peptide_data['PeptideAtlas_USI'])) & (pd.notna(peptide_data['sequence']))]),
         'Num_specs_MSGF': len(peptide_data[(pd.isna(peptide_data['PeptideAtlas_USI'])) & (pd.notna(peptide_data['sequence']))]),
         'Num_specs_PA': len(peptide_data[(pd.notna(peptide_data['PeptideAtlas_USI'])) & (pd.isna(peptide_data['sequence']))]),

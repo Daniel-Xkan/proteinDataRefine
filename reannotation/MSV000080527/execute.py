@@ -9,7 +9,7 @@ with open("mzml_files.txt", "r") as file:
 def parse_filename(filename):
 
 
-    dataset = "MSV000082184"  # Replace with actual logic if needed
+    dataset = "MSV000080527"  # Replace with actual logic if needed
     run = filename
 
     # Further processing to determine Condition and Cohort
@@ -56,6 +56,6 @@ for filename in file_names:
 
 # Create a DataFrame and save to CSV
 df = pd.DataFrame(data)
-df.to_csv('annotated_data.csv', index=False)
+df.to_csv('MSV000080527_annotated.csv', index=False)
 
 print("CSV file has been created: annotated_data.csv")

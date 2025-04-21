@@ -14,7 +14,7 @@ def update_peptide_data(peptide_df, spectrum_df):
         peptide_sequence = row['Peptide sequence']
         
         # Filter spectrum data for the current peptide
-        spectrum_subset = spectrum_df[spectrum_df['sequence'] == peptide_sequence]
+        spectrum_subset = spectrum_df[(spectrum_df['sequence'] == peptide_sequence) | (spectrum_df['PeptideAtlas_peptide_demod'] == peptide_sequence)]
         
         # Update the columns
         num_specs_both = len(spectrum_subset[(pd.notna(spectrum_subset['PeptideAtlas_USI'])) & (pd.notna(spectrum_subset['sequence']))])

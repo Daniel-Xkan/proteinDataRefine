@@ -1,6 +1,7 @@
 import pandas as pd
 from Bio import SeqIO
 from multiprocessing import Pool, cpu_count
+import os
 
 # Load the data
 chunk_size = 10000
@@ -8,7 +9,7 @@ fasta_file = 'uniprotkb_human_proteome_UP000005640_with_isoforms_2024-10-08.fast
 
 # Define a function to get the peptide sequence
 def get_peptide_sequence(row):
-    return row['PeptideAtlas_peptide_demod'] if pd.notna(row['PeptideAtlas_peptide_demod']) else row['opt_global_UnmodPep']
+    return row['PeptideAtlas_peptide_demod'] if pd.notna(row['PeptideAtlas_peptide_demod']) else row['sequence']
 
 # Define a function to get the peptide charge
 def get_peptide_charge(row):
@@ -98,28 +99,28 @@ def process_peptide(to_parallel_process):
     #print(peptide_row)
     return peptide_row
     # Function to process an existing peptide
-def process_existing_peptide(peptide, peptide_data, peptideatlas_df):
-    # Build the output row without counting matches
-    peptide_row = {
-        'Peptide sequence': peptide,
-        'Peptide charge': peptide_data.apply(get_peptide_charge, axis=1).iloc[0],
-        'Protein identifier': peptide_data.apply(get_protein_id_from_msgf, axis=1).iloc[0],
-        'Num_specs_both': len(peptide_data[(pd.notna(peptide_data['PeptideAtlas_USI'])) & (pd.notna(peptide_data['sequence']))]),
-        'Num_specs_MSGF': len(peptide_data[(pd.isna(peptide_data['PeptideAtlas_USI'])) & (pd.notna(peptide_data['sequence']))]),
-        'Num_specs_PA': len(peptide_data[(pd.notna(peptide_data['PeptideAtlas_USI'])) & (pd.isna(peptide_data['sequence']))]),
-        'PA_peptide': 1 if not peptideatlas_df[peptideatlas_df.iloc[:, 5] == peptide].empty else 0,
-        'PA_psms': len(peptideatlas_df[peptideatlas_df.iloc[:, 5] == peptide]),
-        'Num_proteins': None,
-        'List_proteins': None,
-        'Num_genes': None,
-        'List_genes': None,
-        'Num_proteins_saap': None,
-        'List_proteins_saap': None,
-        'Num_genes_saap': None,
-        'List_genes_saap': None
-    }
-    print(f"Existing Peptide ID: {peptide_row['Peptide sequence']}")
-    return peptide_row
+# def process_existing_peptide(peptide, peptide_data, peptideatlas_df):
+#     # Build the output row without counting matches
+#     peptide_row = {
+#         'Peptide sequence': peptide,
+#         'Peptide charge': peptide_data.apply(get_peptide_charge, axis=1).iloc[0],
+#         'Protein identifier': peptide_data.apply(get_protein_id_from_msgf, axis=1).iloc[0],
+#         'Num_specs_both': len(peptide_data[(pd.notna(peptide_data['PeptideAtlas_USI'])) & (pd.notna(peptide_data['sequence']))]),
+#         'Num_specs_MSGF': len(peptide_data[(pd.isna(peptide_data['PeptideAtlas_USI'])) & (pd.notna(peptide_data['sequence']))]),
+#         'Num_specs_PA': len(peptide_data[(pd.notna(peptide_data['PeptideAtlas_USI'])) & (pd.isna(peptide_data['sequence']))]),
+#         'PA_peptide': 1 if not peptideatlas_df[peptideatlas_df.iloc[:, 5] == peptide].empty else 0,
+#         'PA_psms': len(peptideatlas_df[peptideatlas_df.iloc[:, 5] == peptide]),
+#         'Num_proteins': None,
+#         'List_proteins': None,
+#         'Num_genes': None,
+#         'List_genes': None,
+#         'Num_proteins_saap': None,
+#         'List_proteins_saap': None,
+#         'Num_genes_saap': None,
+#         'List_genes_saap': None
+#     }
+#     print(f"Existing Peptide ID: {peptide_row['Peptide sequence']}")
+#     return peptide_row
 # Load the PeptideAtlas data
 peptideatlas_df = pd.read_csv('PeptideAtlas_peptides.tsv', sep='\t')
 
@@ -128,15 +129,27 @@ unique_peptides_set = set()
 
 if __name__ == "__main__":
     # Open the output file
+    peptide_file_exists = os.path.exists('example_reanalysis_peptide.tsv')
     with open('example_reanalysis_peptide.tsv', 'a+') as output_file:
         # Write the header
-        output_file.write('\t'.join([
-            'Peptide sequence', 'Peptide charge', 'Protein identifier', 'Num_specs_both', 'Num_specs_MSGF', 'Num_specs_PA',
-            'PA_peptide', 'PA_psms', 'Num_proteins', 'List_proteins', 'Num_genes', 'List_genes', 'Num_proteins_saap',
-            'List_proteins_saap', 'Num_genes_saap', 'List_genes_saap'
-        ]) + '\n')
+        if not peptide_file_exists:
+            output_file.write('\t'.join([
+                'Peptide sequence', 'Peptide charge', 'Protein identifier', 'Num_specs_both', 'Num_specs_MSGF', 'Num_specs_PA',
+                'PA_peptide', 'PA_psms', 'Num_proteins', 'List_proteins', 'Num_genes', 'List_genes', 'Num_proteins_saap',
+                'List_proteins_saap', 'Num_genes_saap', 'List_genes_saap'
+            ]) + '\n')
         
         # Read the spectrum file in chunks
+        # Check if the file exists
+        if peptide_file_exists:
+            # Read the existing peptides from the file
+            with open('example_reanalysis_peptide.tsv', 'r') as existing_file:
+                # Skip the header
+                next(existing_file)
+                for line in existing_file:
+                    peptide = line.split('\t')[0]  # Extract the peptide sequence (first column)
+                    unique_peptides_set.add(peptide)
+        print(f"Number of unique peptides added: {len(unique_peptides_set)}")
         for chunk in pd.read_csv('example_reanalysis_spectrum.tsv', sep='\t', chunksize=chunk_size):
             chunk['Peptide sequence'] = chunk.apply(get_peptide_sequence, axis=1)
             counter = 0
@@ -155,7 +168,7 @@ if __name__ == "__main__":
                 
                 results = []
                 to_parallel_process = []
-                not_parallel_process = []
+                # not_parallel_process = []
 
                 for peptide, peptide_data, pa_df in peptides_to_process:
                     if peptide not in unique_peptides_set:
@@ -164,54 +177,36 @@ if __name__ == "__main__":
                         to_parallel_process.append((peptide, peptide_data, pa_df))
                     else:
                         #print(f"Processing Existing Peptide: {peptide}")
-                        not_parallel_process.append((peptide, peptide_data, pa_df))
+                        # not_parallel_process.append((peptide, peptide_data, pa_df))
+                        pass
 
                 # Parallel process the new peptides
                 if to_parallel_process:
                     for result in pool.imap_unordered(process_peptide, to_parallel_process):
                         results.append(result)
                         update_counter(result)
-                        print(f"Processed {counter}/{total_peptides} peptides in chunk {chunk.index[0] // chunk_size + 1}")
+                        print(f"Processing new peptide: {result['Peptide sequence']} ({counter}/{len(to_parallel_process)}) in chunk {chunk.index[0] // chunk_size + 1}")
 
                 # Process the existing peptides
-                for peptide, peptide_data, pa_df in not_parallel_process:
-                    results.append(process_existing_peptide(peptide, peptide_data, pa_df))
-                    update_counter(None)
-                    print(f"Processed {counter}/{total_peptides} peptides in chunk {chunk.index[0] // chunk_size + 1}")
+                print('Processing existing peptides...SIKE')
+                # for peptide, peptide_data, pa_df in not_parallel_process:
+                #     results.append(process_existing_peptide(peptide, peptide_data, pa_df))
+                #     update_counter(None)
+                    #print(f"Processed {counter - len(not_parallel_process)}/{len(not_parallel_process)} old peptides in chunk {chunk.index[0] // chunk_size + 1}")
                     
                 for peptide_row in results:
-                    peptide_sequence = peptide_row['Peptide sequence']
+                    # Write the results to the output file
+                    # Write the peptide row as a tab-separated line
+                    row_values = [
+                        str(peptide_row.get(col, '')) for col in [
+                            'Peptide sequence', 'Peptide charge', 'Protein identifier', 'Num_specs_both', 'Num_specs_MSGF', 'Num_specs_PA',
+                            'PA_peptide', 'PA_psms', 'Num_proteins', 'List_proteins', 'Num_genes', 'List_genes', 'Num_proteins_saap',
+                            'List_proteins_saap', 'Num_genes_saap', 'List_genes_saap'
+                        ]
+                    ]
+                    output_file.write('\t'.join(row_values) + '\n')
+                    output_file.flush()  # Ensure the data is written immediately
                     
-                    # Read the current output file content
-                    output_file.seek(0)
-                    lines = output_file.readlines()
-                    print()
-                    # Check if the peptide is already in the file
-                    found = False
-                    for i, line in enumerate(lines):
-                        if line.startswith(peptide_sequence):
-                            found = True
-                            existing_data = line.strip().split('\t')
-                            
-                            # Update the existing line with new data
-                            existing_data[3] = str(int(existing_data[3]) + peptide_row['Num_specs_both'])
-                            existing_data[4] = str(int(existing_data[4]) + peptide_row['Num_specs_MSGF'])
-                            existing_data[5] = str(int(existing_data[5]) + peptide_row['Num_specs_PA'])
-                            existing_data[6] = str(int(existing_data[6]) + peptide_row['PA_peptide'])
-                            existing_data[7] = str(int(existing_data[7]) + peptide_row['PA_psms'])
-                            
-                            # Write the updated line back to the file
-                            lines[i] = '\t'.join(existing_data) + '\n'
-                            break
-                    
-                    if not found:
-                        # Append the new peptide row to the file
-                        lines.append('\t'.join(map(str, peptide_row.values())) + '\n')
-                    
-                    # Write the updated content back to the file
-                    output_file.seek(0)
-                    output_file.truncate()
-                    output_file.writelines(lines)
 
                 pool.close()
                 pool.join()

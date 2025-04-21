@@ -2,7 +2,7 @@ import pandas as pd
 import re
 
 # Read the PeptideAtlas USIs from merged.txt
-usi_file = 'merged.txt'
+usi_file = 'all_usi.txt'
 usi_data = []
 with open(usi_file, 'r') as file:
     for line in file:

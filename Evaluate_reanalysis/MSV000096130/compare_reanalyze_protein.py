@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Load the data
-peptide_file = 'example_peptide_reanalysis.tsv'
+peptide_file = 'example_peptide_reanalysis_updated.tsv'
 protein_file = 'PeptideAtlas_proteins_not_in_MassIVE.tsv'
 
 peptide_df = pd.read_csv(peptide_file, sep='\t')
@@ -19,7 +19,10 @@ result_df = pd.DataFrame(columns=result_columns)
 result_list = []
 for protein in protein_df['nextprot_accession']:
     # Filter peptides that match the current protein
-    matched_peptides = peptide_df[peptide_df['List_proteins'].str.contains(protein, na=False)]
+    matched_peptides = peptide_df[
+        (peptide_df['Protein identifier MSGF'] == protein) | 
+        (peptide_df['Protein identifier PA'] == protein)
+    ]
     
     # Calculate the required counts and sums
     num_peptides_both = len(matched_peptides[matched_peptides['Num_specs_both'] > 0])

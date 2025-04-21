@@ -1,7 +1,6 @@
 import pandas as pd
 from Bio import SeqIO
 from multiprocessing import Pool, cpu_count
-import os
 
 # Load the data
 chunk_size = 10000
@@ -129,27 +128,15 @@ unique_peptides_set = set()
 
 if __name__ == "__main__":
     # Open the output file
-    peptide_file_exists = os.path.exists('example_reanalysis_peptide.tsv')
     with open('example_reanalysis_peptide.tsv', 'a+') as output_file:
         # Write the header
-        if not peptide_file_exists:
-            output_file.write('\t'.join([
-                'Peptide sequence', 'Peptide charge', 'Protein identifier', 'Num_specs_both', 'Num_specs_MSGF', 'Num_specs_PA',
-                'PA_peptide', 'PA_psms', 'Num_proteins', 'List_proteins', 'Num_genes', 'List_genes', 'Num_proteins_saap',
-                'List_proteins_saap', 'Num_genes_saap', 'List_genes_saap'
-            ]) + '\n')
+        output_file.write('\t'.join([
+            'Peptide sequence', 'Peptide charge', 'Protein identifier', 'Num_specs_both', 'Num_specs_MSGF', 'Num_specs_PA',
+            'PA_peptide', 'PA_psms', 'Num_proteins', 'List_proteins', 'Num_genes', 'List_genes', 'Num_proteins_saap',
+            'List_proteins_saap', 'Num_genes_saap', 'List_genes_saap'
+        ]) + '\n')
         
         # Read the spectrum file in chunks
-        # Check if the file exists
-        if peptide_file_exists:
-            # Read the existing peptides from the file
-            with open('example_reanalysis_peptide.tsv', 'r') as existing_file:
-                # Skip the header
-                next(existing_file)
-                for line in existing_file:
-                    peptide = line.split('\t')[0]  # Extract the peptide sequence (first column)
-                    unique_peptides_set.add(peptide)
-        print(f"Number of unique peptides added: {len(unique_peptides_set)}")
         for chunk in pd.read_csv('example_reanalysis_spectrum.tsv', sep='\t', chunksize=chunk_size):
             chunk['Peptide sequence'] = chunk.apply(get_peptide_sequence, axis=1)
             counter = 0
@@ -184,13 +171,13 @@ if __name__ == "__main__":
                     for result in pool.imap_unordered(process_peptide, to_parallel_process):
                         results.append(result)
                         update_counter(result)
-                        print(f"Processed {counter}/{len(to_parallel_process)} new peptides in chunk {chunk.index[0] // chunk_size + 1}")
+                        print(f"Processed {counter}/{total_peptides} peptides in chunk {chunk.index[0] // chunk_size + 1}")
 
                 # Process the existing peptides
                 for peptide, peptide_data, pa_df in not_parallel_process:
                     results.append(process_existing_peptide(peptide, peptide_data, pa_df))
                     update_counter(None)
-                    print(f"Processed {counter - len(to_parallel_process)}/{len(not_parallel_process)} old peptides in chunk {chunk.index[0] // chunk_size + 1}")
+                    print(f"Processed {counter}/{total_peptides} peptides in chunk {chunk.index[0] // chunk_size + 1}")
                     
                 for peptide_row in results:
                     peptide_sequence = peptide_row['Peptide sequence']
