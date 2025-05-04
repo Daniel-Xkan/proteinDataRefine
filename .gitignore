@@ -1,3 +1,7 @@
 *.tsv
 *.txt
 *.jsp
+*.pkl
+*.csv
+*.fasta
+*.fastaq
